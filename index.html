@@ -359,6 +359,9 @@ function App(){
   const [sortDir, setSortDir] = useState('asc');
   const [sortFieldTurbo, setSortFieldTurbo] = useState(null);
   const [sortDirTurbo, setSortDirTurbo] = useState('asc');
+  const [detailSearch, setDetailSearch] = useState('');
+  const [detailSortField, setDetailSortField] = useState(null);
+  const [detailSortDir, setDetailSortDir] = useState('asc');
 
   const showToast = (msg, action) => {
     setToast(msg);
@@ -782,6 +785,11 @@ function App(){
     else { setSortFieldTurbo(field); setSortDirTurbo('asc'); }
   };
 
+  const toggleDetailSort = (field) => {
+    if(detailSortField === field){ setDetailSortDir(detailSortDir === 'asc' ? 'desc' : 'asc'); }
+    else { setDetailSortField(field); setDetailSortDir('asc'); }
+  };
+
   const sortArrow = (field, curField, curDir) => curField === field ? (curDir === 'asc' ? ' ▲' : ' ▼') : '';
 
   const exportToExcel = (rows, typeLabel, typeField) => {
@@ -874,7 +882,7 @@ function App(){
               {settings.motortypes.map(mt => {
                 const d = byMotor[mt] || {count:0,total:0,low:false};
                 return (
-                  <div key={mt} className={"stat-card" + (d.low?" low":"")} onClick={()=>setDetailMotor(mt)} style={{cursor:'pointer'}}>
+                  <div key={mt} className={"stat-card" + (d.low?" low":"")} onClick={()=>{setDetailMotor(mt); setDetailSearch(''); setDetailSortField(null); setDetailSortDir('asc');}} style={{cursor:'pointer'}}>
                     <div className="stat-motor">{mt}</div>
                     <div className="stat-count">{d.total}</div>
                     <div className="stat-label">{d.count} regel{d.count===1?'':'s'}</div>
@@ -1180,29 +1188,48 @@ function App(){
               <div style={{fontFamily:'Oswald,sans-serif', fontWeight:700, fontSize:18}}>{detailMotor}</div>
               <button className="btn btn-ghost btn-sm" onClick={()=>setDetailMotor(null)}>Sluiten</button>
             </div>
-            {parts.filter(p => p.motortype === detailMotor).length === 0 ? (
-              <div className="empty-state" style={{padding:20}}>
-                <div className="em-title">Geen onderdelen</div>
-                <div>Er staat nog niets geregistreerd voor dit motortype.</div>
-              </div>
-            ) : (
-              <table>
-                <thead><tr><th>Motortype</th><th>Locatie</th><th>Omschrijving</th><th>Aantal</th><th>Conditie</th><th>Opmerking</th></tr></thead>
-                <tbody>
-                  {parts.filter(p => p.motortype === detailMotor).map(p => (
-                    <tr key={p.id}>
-                      <td><span className="pill">{p.motortype}</span></td>
-                      <td>{p.locatie}</td>
-                      <td>{p.omschrijving}</td>
-                      <td style={{fontWeight:600, color: p.aantal < settings.lowStockThreshold ? 'var(--rust)' : 'inherit'}}>{p.aantal}</td>
-                      <td><span className={"cond-pill " + condClass(p.conditie)}>{p.conditie}</span></td>
-                      <td style={{color:'#7A8390'}}>{p.opmerking || '—'}</td>
+            <div className="toolbar" style={{marginBottom:12}}>
+              <input type="text" placeholder="Zoeken op onderdeel of locatie..." value={detailSearch} onChange={e=>setDetailSearch(e.target.value)} style={{minWidth:240}} />
+            </div>
+            {(() => {
+              const detailRows = sortRows(
+                parts.filter(p => p.motortype === detailMotor).filter(p => {
+                  const q = detailSearch.trim().toLowerCase();
+                  return !q || p.omschrijving.toLowerCase().includes(q) || p.locatie.toLowerCase().includes(q);
+                }),
+                detailSortField, detailSortDir
+              );
+              return detailRows.length === 0 ? (
+                <div className="empty-state" style={{padding:20}}>
+                  <div className="em-title">Geen onderdelen</div>
+                  <div>Er staat nog niets geregistreerd voor dit motortype, of je filter levert niets op.</div>
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Motortype</th>
+                      <th style={{cursor:'pointer'}} onClick={()=>toggleDetailSort('locatie')}>Locatie{sortArrow('locatie', detailSortField, detailSortDir)}</th>
+                      <th style={{cursor:'pointer'}} onClick={()=>toggleDetailSort('omschrijving')}>Omschrijving{sortArrow('omschrijving', detailSortField, detailSortDir)}</th>
+                      <th style={{cursor:'pointer'}} onClick={()=>toggleDetailSort('aantal')}>Aantal{sortArrow('aantal', detailSortField, detailSortDir)}</th>
+                      <th>Conditie</th><th>Opmerking</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-
-            )}
+                  </thead>
+                  <tbody>
+                    {detailRows.map(p => (
+                      <tr key={p.id}>
+                        <td><span className="pill">{p.motortype}</span></td>
+                        <td>{p.locatie}</td>
+                        <td>{p.omschrijving}</td>
+                        <td style={{fontWeight:600, color: p.aantal < settings.lowStockThreshold ? 'var(--rust)' : 'inherit'}}>{p.aantal}</td>
+                        <td><span className={"cond-pill " + condClass(p.conditie)}>{p.conditie}</span></td>
+                        <td style={{color:'#7A8390'}}>{p.opmerking || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
         </div>
       )}
